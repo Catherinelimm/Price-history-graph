@@ -30,6 +30,7 @@ function App() {
         params: {
           itemName,
           country,
+          source,
         },
       });
       setPriceHistory(response.data.data);
@@ -41,20 +42,17 @@ function App() {
 
   const options = {
     plugins:{
-      legends:true
-    },
-    scales:{
-      y:{
-        min:3,
-        max:6,
-      },
+      legends:true,
     }
-  }
+  };
 
 
   return (
+    <div className="bg-[#EEEEEE] ">
     <div className="container mx-auto p-4">
-      <h1 className="text-3xl font-bold mb-4">Item Price History</h1>
+    <div class=" flex items-center justify-center">
+  <h1 class="text-3xl text-[#053B50] font-bold mb-4">Item Price History Graph</h1>
+  </div>
       <div className="flex space-x-2 mb-4">
         <input
           type="text"
@@ -77,13 +75,13 @@ function App() {
         >
           <option value="US">US</option>
         </select>
-        <button onClick={handleSearch} className="p-2 bg-blue-500 text-white">
+        <button onClick={handleSearch} className="p-2 rounded-md bg-[#053B50] text-white">
           Search
         </button>
       </div>
       {priceHistory != 0 && (
         <div>
-          <h2 className="text-xl font-bold mb-2">
+          <h2 className="text-xl text-[#053B50] font-serif mb-2">
             Price History for {itemName} ({source} - {country})
           </h2>
           <Line
@@ -93,14 +91,16 @@ function App() {
                 {
                   label: "Price",
                   data: priceHistory.map((entry) => entry.price),
-                  borderColor: "blue",
+                  borderColor: "darkblue",
                   fill: false,
                 },
               ],
             }}
+            options={options}
           />
         </div>
       )}
+    </div>
     </div>
   );
 }

@@ -2,42 +2,23 @@ const express = require("express");
 const router = express.Router();
 const PriceHistory = require("../model/priceHistory");
 const axios = require("axios");
+const { priceByDomain } = require("../helper/priceByDomain");
 
 router.get("/price-history", async (req, res) => {
-  const { itemName, country } = req.query;
-
   try {
-    const d = {
-      itemName,
-      country,
-    };
+    const { itemName, country, source } = req.query;
 
-    // // Fetch amazon price history from API
-    const result = await fetchRealTimeAmazonData(d);
-    const products = result.data.products;
-    const dateCreated = new Date().toLocaleDateString("en-GB");
+    let result;
 
-    // // Extract and store relevant data in MongoDB
-    for (const product of products) {
-      const { currency, product_title, product_price } = product;
-
-      newPrice = String(product_price).substring(1);
-
-      const newPriceHistory = new PriceHistory({
-        country: country,
-        currency: currency,
-        product_name: product_title,
-        price: newPrice,
-        createdAt: dateCreated,
-      });
-      // Save to MongoDB
-      await newPriceHistory.save();
+    if (source === "Amazon" || source === "Ebay") {
+      result = await fetchPriceData(source, itemName, country);
+      await saveToDatabase(result, country, source);
     }
 
-    // Retrieve data from MongoDB based on itemName and country
-    const retrievedData = await retrievePriceHistoryFromMongoDB(
+    const retrievedData = await retrievePriceHistoryFromDatabase(
       itemName,
-      country
+      country,
+      source
     );
 
     res.status(200).json({
@@ -50,58 +31,94 @@ router.get("/price-history", async (req, res) => {
   }
 });
 
-// Fetch amazon price history from API
-async function fetchRealTimeAmazonData(v) {
-  // console.log(v, "V DATA NEW");
-  const { itemName, country } = v;
+async function saveToDatabase(products, country, source) {
+  const dateCreated = new Date().toLocaleDateString("en-GB");
 
-  const options = {
-    headers: {
-      "X-RapidAPI-Key": "68f1d988f6mshdd52c3e46e1dc6fp1d1c56jsn519f590b910d",
-      "X-RapidAPI-Host": "real-time-amazon-data.p.rapidapi.com",
-    },
-    params: {
-      query: `${itemName}`,
-      country: `${country}`,
-      category_id: "aps",
-    },
+  const currencyObj = {
+    US: "USD",
+    UK: "GBP",
   };
 
-  // console.log(options, "Option");
+  // console.log(products.search_results.length, "Products");
+
+  const dataFromSource = {
+    Amazon: products?.data?.products,
+    Ebay: products?.search_results,
+  };
+
+  console.log(dataFromSource[source], "Data from source");
+
+  const saveDbObj = {
+    currency: currencyObj[country],
+    createdAt: dateCreated,
+    source: source,
+    country: country,
+  };
+
+  const sortedData = dataFromSource[source]?.map((e) => {
+    switch (source) {
+      case "Amazon":
+        return {
+          ...saveDbObj,
+          price: e?.product_price?.replace(/[\$,]/g, ""),
+          product_name: e?.product_title,
+        };
+        break;
+      case "Ebay":
+        return {
+          ...saveDbObj,
+          price: e?.price?.value,
+          product_name: e?.title,
+        };
+        break;
+    }
+  });
+
+  const filterDataWithoutPrice = sortedData.filter(
+    (e) => ![null, undefined].includes(e.price)
+  );
+
+  // Use insertMany for bulk insert and handle the promise
+  PriceHistory.insertMany(filterDataWithoutPrice)
+    .then((result) => {
+      console.log(`Saved ${result.length} documents.`);
+    })
+    .catch((error) => {
+      console.error(error);
+    });
+}
+
+async function fetchPriceData(source, itemName, country) {
+  const { apiUrl, requestOptions } = priceByDomain({
+    source,
+    itemName,
+    country,
+  });
 
   try {
-    // Call real time amazon data API
-    const realTimeAmazonData = await axios.get(
-      "https://real-time-amazon-data.p.rapidapi.com/search",
-      options
-    );
+    const response = await axios.get(apiUrl, requestOptions);
 
-    return realTimeAmazonData.data;
-    
+    return response.data;
   } catch (error) {
     console.error(error);
-    throw new Error("Error in Fetch Realtime Amazon Data function");
+    throw new Error(`Error in Fetch ${source} Price Data function`);
   }
 }
 
-// Fetch price history from Database
-async function retrievePriceHistoryFromMongoDB(itemName, country) {
+async function retrievePriceHistoryFromDatabase(itemName, country, source) {
   try {
     const query = {
-      product_name: itemName,
-      country: country,
-    };
-
-    // Assuming you want to find documents based on the product_name and country
-    const priceHistoryData = await PriceHistory.find({
       product_name: { $regex: itemName, $options: "i" },
-      // country: country,
-    });
-    // console.log(priceHistoryData, "Price HISTORY DATA");
+      country,
+      source,
+    };
+    const priceHistoryData = await PriceHistory.find(query);
+
+    console.log(priceHistoryData, "Price History Data");
     return priceHistoryData;
   } catch (error) {
-    console.error("Error retrieving data from MongoDB:", error);
-    throw new Error("Error in retrievePriceHistoryFromMongoDB function");
+    console.error("Error retrieving data from Database:", error);
+    throw new Error("Error in Retrieve Price History from Database function");
   }
 }
 
