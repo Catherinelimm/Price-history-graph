@@ -4,9 +4,9 @@ const PriceHistory = require("../model/priceHistory");
 const axios = require("axios");
 const { priceByDomain } = require("../helper/priceByDomain");
 
-router.get("/price-history", async (req, res) => {
+router.post("/price-history", async (req, res) => {
   try {
-    const { itemName, country, source } = req.query;
+    const { itemName, country, source } = req.body;
 
     let result;
 

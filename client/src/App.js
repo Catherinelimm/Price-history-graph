@@ -23,6 +23,7 @@ function App() {
   const [source, setSource] = useState("Amazon");
   const [country, setCountry] = useState("US");
   const [priceHistory, setPriceHistory] = useState([]);
+  const [selectedRecords, setSelectedRecords] = useState(10); // Default value
 
   const handleSearch = async () => {
     try {
@@ -50,9 +51,7 @@ function App() {
   return (
     <div className="bg-[#EEEEEE] ">
     <div className="container mx-auto p-4">
-    <div class=" flex items-center justify-center">
-  <h1 class="text-3xl text-[#053B50] font-bold mb-4">Item Price History Graph</h1>
-  </div>
+      <h1 className="text-3xl  text-[#053B50] font-bold mb-4">Item Price History</h1>
       <div className="flex space-x-2 mb-4">
         <input
           type="text"
@@ -67,6 +66,7 @@ function App() {
           className="p-2 border border-gray-300"
         >
           <option value="Amazon">Amazon</option>
+          <option value="Ebay">Ebay</option>
         </select>
         <select
           value={country}
@@ -74,23 +74,40 @@ function App() {
           className="p-2 border border-gray-300"
         >
           <option value="US">US</option>
+          <option value="UK">UK</option>
+        </select>
+        <select
+          value={selectedRecords}
+          onChange={(e) => setSelectedRecords(Number(e.target.value))}
+          className="p-2 border border-gray-300"
+        >
+          <option value={10}>Show 10 records</option>
+          <option value={15}>Show 15 records</option>
+          <option value={20}>Show 20 records</option>
+          <option value={30}>Show 30 records</option>
+          <option value={50}>Show 50 records</option>
+          <option value={100}>Show 100 records</option>
         </select>
         <button onClick={handleSearch} className="p-2 rounded-md bg-[#053B50] text-white">
           Search
         </button>
       </div>
-      {priceHistory != 0 && (
+      {priceHistory !== 0 && (
         <div>
-          <h2 className="text-xl text-[#053B50] font-serif mb-2">
+          <h2 className="text-xl text-[#053B50] font-bold mb-2">
             Price History for {itemName} ({source} - {country})
           </h2>
           <Line
             data={{
-              labels: priceHistory.map((entry) => entry.createdAt),
+              labels: priceHistory
+                .slice(-selectedRecords)
+                .map((entry) => entry.createdAt),
               datasets: [
                 {
                   label: "Price",
-                  data: priceHistory.map((entry) => entry.price),
+                  data: priceHistory
+                    .slice(-selectedRecords)
+                    .map((entry) => entry.price),
                   borderColor: "darkblue",
                   fill: false,
                 },
